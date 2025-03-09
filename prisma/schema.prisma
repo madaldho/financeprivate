@@ -21,22 +21,27 @@ model Wallet {
   transactions      Transaction[] @relation("WalletTransactions")
   sourceTransactions Transaction[] @relation("SourceWalletTransactions")
   targetTransactions Transaction[] @relation("TargetWalletTransactions")
-
+  isActive          Boolean       @default(true)
+  
   @@index([name])
+  @@index([isActive])
 }
 
 model Category {
   id          String        @id @default(cuid())
   name        String
   color       String
-  type        String // "pemasukan" | "pengeluaran" | "transfer" | "convert"
+  type        String
   icon        String?
   description String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   transactions Transaction[]
-
+  isActive    Boolean       @default(true)
+  
   @@index([name])
+  @@index([type])
+  @@index([isActive])
 }
 
 model Transaction {
@@ -47,7 +52,7 @@ model Transaction {
   wallet         Wallet    @relation("WalletTransactions", fields: [walletId], references: [id])
   walletId       String
   amount         Float
-  type           String // "pemasukan" | "pengeluaran" | "transfer" | "convert"
+  type           String
   description    String?
   status         String    @default("lunas")
   createdAt      DateTime  @default(now())
@@ -56,9 +61,10 @@ model Transaction {
   sourceWalletId String?
   targetWallet   Wallet?   @relation("TargetWalletTransactions", fields: [targetWalletId], references: [id])
   targetWalletId String?
-
+  
   @@index([date])
   @@index([type])
+  @@index([status])
   @@index([categoryId])
   @@index([walletId])
 }
