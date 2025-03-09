@@ -31,8 +31,9 @@ type TransactionFormProps = {
 export function TransactionForm({ type, onSuccess }: TransactionFormProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [wallets, setWallets] = useState<WalletBalance[]>([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [transactionData, setTransactionData] = useState<{
     amount: number
@@ -55,16 +56,21 @@ export function TransactionForm({ type, onSuccess }: TransactionFormProps) {
   useEffect(() => {
     async function loadData() {
       try {
+        setLoading(true)
+        setError(null)
+
         const [categoriesData, walletsData] = await Promise.all([getCategories(), getWallets()])
 
-        // Filter categories by type
+        // Filter kategori berdasarkan tipe transaksi
         const filteredCategories = categoriesData.filter((cat) => cat.type === type || cat.type === "transfer")
 
         setCategories(filteredCategories)
         setWallets(walletsData)
-      } catch (error) {
-        console.error("Error loading form data:", error)
+      } catch (err) {
+        console.error("Error loading form data:", err)
         setError("Gagal memuat data kategori dan dompet")
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -111,6 +117,21 @@ export function TransactionForm({ type, onSuccess }: TransactionFormProps) {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (loading) {
+    return <div className="p-4 text-center">Memuat data...</div>
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+        <p className="text-red-600">{error}</p>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-2">
+          Coba lagi
+        </Button>
+      </div>
+    )
   }
 
   return (

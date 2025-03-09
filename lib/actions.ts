@@ -24,12 +24,12 @@ export async function getTransactions(filter = "semua", sortBy = "tanggal", orde
     } else if (filter === "bulan-lalu") {
       const now = new Date()
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth(), 0)
 
       whereClause = {
         date: {
           gte: startOfLastMonth,
-          lte: endOfLastMonth,
+          lte: endOfMonth,
         },
       }
     }
@@ -498,31 +498,31 @@ export async function getCategories() {
 export async function updateSettings(type: "wallets" | "categories", data: any[]) {
   try {
     if (type === "wallets") {
-      // Hapus wallet yang tidak ada di data baru
-      const existingWallets = await prisma.wallet.findMany()
-      const newWalletIds = data.map((w) => w.id).filter(Boolean)
+      // Hapus semua wallet yang ada terlebih dahulu
+      await prisma.wallet.deleteMany({
+        where: {
+          // Hanya hapus wallet yang tidak memiliki transaksi
+          transactions: {
+            none: {},
+          },
+        },
+      })
 
-      for (const wallet of existingWallets) {
-        if (!newWalletIds.includes(wallet.id)) {
-          // Periksa apakah wallet digunakan dalam transaksi
-          const transactionCount = await prisma.transaction.count({
-            where: { walletId: wallet.id },
-          })
-
-          if (transactionCount === 0) {
-            await prisma.wallet.delete({
-              where: { id: wallet.id },
-            })
-          }
-        }
-      }
-
-      // Update atau buat wallet baru
+      // Buat wallet baru atau update yang sudah ada
       for (const wallet of data) {
         if (wallet.id) {
-          await prisma.wallet.update({
+          await prisma.wallet.upsert({
             where: { id: wallet.id },
-            data: {
+            update: {
+              name: wallet.name,
+              icon: wallet.icon,
+              color: wallet.color,
+              balance: Number(wallet.balance),
+              type: wallet.type,
+              description: wallet.description,
+            },
+            create: {
+              id: wallet.id,
               name: wallet.name,
               icon: wallet.icon,
               color: wallet.color,
@@ -545,31 +545,30 @@ export async function updateSettings(type: "wallets" | "categories", data: any[]
         }
       }
     } else if (type === "categories") {
-      // Hapus kategori yang tidak ada di data baru
-      const existingCategories = await prisma.category.findMany()
-      const newCategoryIds = data.map((c) => c.id).filter(Boolean)
+      // Hapus semua kategori yang ada terlebih dahulu
+      await prisma.category.deleteMany({
+        where: {
+          // Hanya hapus kategori yang tidak memiliki transaksi
+          transactions: {
+            none: {},
+          },
+        },
+      })
 
-      for (const category of existingCategories) {
-        if (!newCategoryIds.includes(category.id)) {
-          // Periksa apakah kategori digunakan dalam transaksi
-          const transactionCount = await prisma.transaction.count({
-            where: { categoryId: category.id },
-          })
-
-          if (transactionCount === 0) {
-            await prisma.category.delete({
-              where: { id: category.id },
-            })
-          }
-        }
-      }
-
-      // Update atau buat kategori baru
+      // Buat kategori baru atau update yang sudah ada
       for (const category of data) {
         if (category.id) {
-          await prisma.category.update({
+          await prisma.category.upsert({
             where: { id: category.id },
-            data: {
+            update: {
+              name: category.name,
+              color: category.color,
+              type: category.type,
+              icon: category.icon,
+              description: category.description,
+            },
+            create: {
+              id: category.id,
               name: category.name,
               color: category.color,
               type: category.type,
@@ -602,44 +601,35 @@ export async function updateSettings(type: "wallets" | "categories", data: any[]
   }
 }
 
-// Fungsi untuk inisialisasi data default jika database kosong
+// Perbaiki fungsi initializeDefaultData
 export async function initializeDefaultData() {
   try {
-    // Periksa apakah ada kategori
+    // Periksa apakah sudah ada data
     const categoryCount = await prisma.category.count()
+    const walletCount = await prisma.wallet.count()
 
     if (categoryCount === 0) {
       // Buat kategori default
-      for (const category of DEFAULT_CATEGORIES) {
-        await prisma.category.create({
-          data: {
-            name: category.name,
-            color: category.color,
-            type: category.type,
-            icon: category.icon || "📦",
-            description: category.description || "",
-          },
-        })
-      }
+      await prisma.category.createMany({
+        data: DEFAULT_CATEGORIES.map((cat) => ({
+          ...cat,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+        skipDuplicates: true,
+      })
     }
-
-    // Periksa apakah ada wallet
-    const walletCount = await prisma.wallet.count()
 
     if (walletCount === 0) {
       // Buat wallet default
-      for (const wallet of DEFAULT_WALLETS) {
-        await prisma.wallet.create({
-          data: {
-            name: wallet.name,
-            color: wallet.color,
-            balance: wallet.balance,
-            icon: wallet.icon,
-            type: wallet.type || "other",
-            description: wallet.description || "",
-          },
-        })
-      }
+      await prisma.wallet.createMany({
+        data: DEFAULT_WALLETS.map((wallet) => ({
+          ...wallet,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+        skipDuplicates: true,
+      })
     }
 
     return { success: true }
