@@ -7,7 +7,7 @@ async function main() {
   try {
     console.log("Initializing database...")
 
-    // Buat kategori default
+    // Create default categories
     console.log("Creating default categories...")
     for (const category of DEFAULT_CATEGORIES) {
       await prisma.category.create({
@@ -21,7 +21,7 @@ async function main() {
       })
     }
 
-    // Buat wallet default
+    // Create default wallets
     console.log("Creating default wallets...")
     for (const wallet of DEFAULT_WALLETS) {
       await prisma.wallet.create({

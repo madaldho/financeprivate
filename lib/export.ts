@@ -6,7 +6,7 @@ import { format } from "date-fns"
 
 export async function exportTransactionsToExcel(startDate?: string, endDate?: string) {
   try {
-    // Buat filter berdasarkan rentang tanggal
+    // Build filter based on date range
     let whereClause = {}
 
     if (startDate && endDate) {
@@ -18,7 +18,7 @@ export async function exportTransactionsToExcel(startDate?: string, endDate?: st
       }
     }
 
-    // Ambil transaksi dari database
+    // Get transactions from database
     const transactions = await prisma.transaction.findMany({
       where: whereClause,
       include: {
@@ -30,7 +30,7 @@ export async function exportTransactionsToExcel(startDate?: string, endDate?: st
       },
     })
 
-    // Format data untuk Excel
+    // Format data for Excel
     const data = transactions.map((tx) => ({
       Tanggal: format(tx.date, "dd/MM/yyyy"),
       Kategori: tx.category.name,
@@ -41,14 +41,14 @@ export async function exportTransactionsToExcel(startDate?: string, endDate?: st
       Status: tx.status,
     }))
 
-    // Buat workbook dan worksheet
+    // Create workbook and worksheet
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(data)
 
-    // Tambahkan worksheet ke workbook
+    // Add worksheet to workbook
     XLSX.utils.book_append_sheet(wb, ws, "Transaksi")
 
-    // Buat buffer
+    // Create buffer
     const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
 
     return buffer
