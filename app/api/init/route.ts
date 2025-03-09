@@ -67,8 +67,6 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       message: "Database initialized successfully",
-      categories: await prisma.category.count(),
-      wallets: await prisma.wallet.count(),
     })
   } catch (error) {
     console.error("Error initializing database:", error)

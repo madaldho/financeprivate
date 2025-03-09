@@ -19,7 +19,7 @@ export function InitializeButton() {
       if (data.success) {
         toast({
           title: "Berhasil",
-          description: `Data berhasil diinisialisasi. ${data.categories} kategori dan ${data.wallets} wallet dibuat.`,
+          description: `Data berhasil diinisialisasi.`,
         })
         // Reload halaman untuk memuat data baru
         window.location.reload()
