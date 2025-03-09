@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client"
 
-// Buat PrismaClient singleton
+// Create PrismaClient singleton
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
@@ -8,21 +8,25 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    datasources: {
+      db: {
+        url: process.env.POSTGRES_PRISMA_URL,
+      },
+    },
   })
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma
 }
 
-// Tambahkan middleware untuk logging yang lebih aman
-if (process.env.NODE_ENV === "development") {
-  prisma.$use(async (params, next) => {
-    const before = Date.now()
-    const result = await next(params)
-    const after = Date.now()
-    console.log(`Query ${params.model}.${params.action} took ${after - before}ms`)
-    return result
+// Add connection error handling
+prisma
+  .$connect()
+  .then(() => {
+    console.log("Successfully connected to the database")
   })
-}
+  .catch((e) => {
+    console.error("Failed to connect to the database:", e)
+  })
 

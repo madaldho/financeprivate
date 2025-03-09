@@ -1,6 +1,6 @@
 "use server"
 
-import { prisma } from "./db"
+import { supabase } from "./supabase"
 import { revalidatePath } from "next/cache"
 import { format } from "date-fns"
 import { DEFAULT_CATEGORIES, DEFAULT_WALLETS } from "./default-data"
@@ -8,64 +8,50 @@ import { DEFAULT_CATEGORIES, DEFAULT_WALLETS } from "./default-data"
 // Fungsi untuk mendapatkan transaksi dengan filter
 export async function getTransactions(filter = "semua", sortBy = "tanggal", order: "asc" | "desc" = "desc") {
   try {
-    let whereClause = {}
+    let query = supabase.from("Transaction").select(`
+        *,
+        category:Category(*),
+        wallet:Wallet(*)
+      `)
 
     if (filter === "bulan-ini") {
       const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
 
-      whereClause = {
-        date: {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        },
-      }
+      query = query.gte("date", startOfMonth).lte("date", endOfMonth)
     } else if (filter === "bulan-lalu") {
       const now = new Date()
-      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString()
 
-      whereClause = {
-        date: {
-          gte: startOfLastMonth,
-          lte: endOfMonth,
-        },
-      }
+      query = query.gte("date", startOfLastMonth).lte("date", endOfMonth)
     }
 
     // Tentukan pengurutan
-    let orderBy = {}
     if (sortBy === "tanggal") {
-      orderBy = { date: order }
+      query = query.order("date", { ascending: order === "asc" })
     } else if (sortBy === "nominal") {
-      orderBy = { amount: order }
-    } else if (sortBy === "kategori") {
-      orderBy = { category: { name: order } }
-    } else if (sortBy === "jenisTransaksi") {
-      orderBy = { wallet: { name: order } }
+      query = query.order("amount", { ascending: order === "asc" })
     }
 
-    const transactions = await prisma.transaction.findMany({
-      where: whereClause,
-      include: {
-        category: true,
-        wallet: true,
-      },
-      orderBy,
-    })
+    const { data: transactions, error } = await query
+
+    if (error) {
+      throw error
+    }
 
     // Format untuk frontend
     return transactions.map((tx) => ({
       id: tx.id,
-      tanggal: format(tx.date, "yyyy-MM-dd"),
+      tanggal: format(new Date(tx.date), "yyyy-MM-dd"),
       kategori: tx.category.name,
       jenisTransaksi: tx.wallet.name,
       pemasukan: tx.type === "pemasukan" ? tx.amount.toString() : "0",
       pengeluaran: tx.type === "pengeluaran" ? tx.amount.toString() : "0",
       deskripsi: tx.description || "",
       status: tx.status,
-      timestamp: tx.createdAt.toISOString(),
+      timestamp: tx.createdAt,
     }))
   } catch (error) {
     console.error("Error fetching transactions:", error)
@@ -79,46 +65,63 @@ export async function saveTransaction(data: any) {
     const { tanggal, kategori, jenisTransaksi, pemasukan, pengeluaran, deskripsi, status } = data
 
     // Dapatkan kategori dan wallet
-    const category = await prisma.category.findFirst({
-      where: { name: kategori },
-    })
+    const { data: categories, error: categoryError } = await supabase
+      .from("Category")
+      .select("*")
+      .eq("name", kategori)
+      .limit(1)
 
-    const wallet = await prisma.wallet.findFirst({
-      where: { name: jenisTransaksi },
-    })
-
-    if (!category || !wallet) {
-      throw new Error("Kategori atau wallet tidak ditemukan")
+    if (categoryError || !categories || categories.length === 0) {
+      throw new Error("Kategori tidak ditemukan")
     }
+
+    const { data: wallets, error: walletError } = await supabase
+      .from("Wallet")
+      .select("*")
+      .eq("name", jenisTransaksi)
+      .limit(1)
+
+    if (walletError || !wallets || wallets.length === 0) {
+      throw new Error("Wallet tidak ditemukan")
+    }
+
+    const category = categories[0]
+    const wallet = wallets[0]
 
     // Buat transaksi
     const amount = Number(pemasukan) || Number(pengeluaran)
     const type = Number(pemasukan) > 0 ? "pemasukan" : "pengeluaran"
 
-    await prisma.$transaction(async (tx) => {
-      // Buat transaksi
-      await tx.transaction.create({
-        data: {
-          date: new Date(tanggal),
-          categoryId: category.id,
-          walletId: wallet.id,
-          amount,
-          type,
-          description: deskripsi,
-          status,
-        },
+    // Insert transaction
+    const { data: transaction, error: transactionError } = await supabase
+      .from("Transaction")
+      .insert({
+        date: new Date(tanggal),
+        categoryId: category.id,
+        walletId: wallet.id,
+        amount,
+        type,
+        description: deskripsi,
+        status,
       })
+      .select()
+      .single()
 
-      // Update saldo wallet
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: {
-          balance: {
-            increment: type === "pemasukan" ? amount : -amount,
-          },
-        },
+    if (transactionError) {
+      throw transactionError
+    }
+
+    // Update wallet balance
+    const { error: updateError } = await supabase
+      .from("Wallet")
+      .update({
+        balance: wallet.balance + (type === "pemasukan" ? amount : -amount),
       })
-    })
+      .eq("id", wallet.id)
+
+    if (updateError) {
+      throw updateError
+    }
 
     // Revalidasi halaman
     revalidatePath("/")
@@ -143,82 +146,104 @@ export async function saveConvertTransaction(data: {
 }) {
   try {
     // Dapatkan wallet
-    const sourceWalletData = await prisma.wallet.findFirst({
-      where: { name: data.sourceWallet },
-    })
+    const { data: sourceWallets, error: sourceError } = await supabase
+      .from("Wallet")
+      .select("*")
+      .eq("name", data.sourceWallet)
+      .limit(1)
 
-    const targetWalletData = await prisma.wallet.findFirst({
-      where: { name: data.targetWallet },
-    })
+    if (sourceError || !sourceWallets || sourceWallets.length === 0) {
+      throw new Error("Wallet sumber tidak ditemukan")
+    }
 
-    if (!sourceWalletData || !targetWalletData) {
-      throw new Error("Wallet tidak ditemukan")
+    const { data: targetWallets, error: targetError } = await supabase
+      .from("Wallet")
+      .select("*")
+      .eq("name", data.targetWallet)
+      .limit(1)
+
+    if (targetError || !targetWallets || targetWallets.length === 0) {
+      throw new Error("Wallet tujuan tidak ditemukan")
     }
 
     // Dapatkan kategori convert
-    const convertCategory = await prisma.category.findFirst({
-      where: { name: "CONVERT" },
-    })
+    const { data: categories, error: categoryError } = await supabase
+      .from("Category")
+      .select("*")
+      .eq("name", "CONVERT")
+      .limit(1)
 
-    if (!convertCategory) {
+    if (categoryError || !categories || categories.length === 0) {
       throw new Error("Kategori CONVERT tidak ditemukan")
     }
+
+    const sourceWallet = sourceWallets[0]
+    const targetWallet = targetWallets[0]
+    const convertCategory = categories[0]
 
     // Pastikan nilai adalah angka
     const sourceAdminFee = Number(data.sourceAdminFee) || 0
     const targetAdminFee = Number(data.targetAdminFee) || 0
     const amount = Number(data.amount) || 0
 
-    await prisma.$transaction(async (tx) => {
-      // Buat transaksi pengeluaran dari source wallet
-      await tx.transaction.create({
-        data: {
-          date: new Date(data.tanggal),
-          categoryId: convertCategory.id,
-          walletId: sourceWalletData.id,
-          amount: amount + sourceAdminFee,
-          type: "pengeluaran",
-          description: `Convert ke ${data.targetWallet}${sourceAdminFee > 0 ? ` (Biaya admin sumber: ${sourceAdminFee})` : ""}`,
-          status: "lunas",
-          sourceWalletId: sourceWalletData.id,
-          targetWalletId: targetWalletData.id,
-        },
-      })
-
-      // Buat transaksi pemasukan ke target wallet
-      await tx.transaction.create({
-        data: {
-          date: new Date(data.tanggal),
-          categoryId: convertCategory.id,
-          walletId: targetWalletData.id,
-          amount: amount - targetAdminFee,
-          type: "pemasukan",
-          description: `Convert dari ${data.sourceWallet}${targetAdminFee > 0 ? ` (Biaya admin tujuan: ${targetAdminFee})` : ""}`,
-          status: "lunas",
-          sourceWalletId: sourceWalletData.id,
-          targetWalletId: targetWalletData.id,
-        },
-      })
-
-      // Update saldo wallet
-      await tx.wallet.update({
-        where: { id: sourceWalletData.id },
-        data: {
-          balance: {
-            decrement: amount + sourceAdminFee,
-          },
-        },
-      })
-
-      await tx.wallet.update({
-        where: { id: targetWalletData.id },
-        data: {
-          balance: {
-            increment: amount - targetAdminFee,
-          },
-        },
-      })
+    // Begin transaction
+    // 1. Create transaction for source wallet (pengeluaran)
+    const { error: sourceTransactionError } = await supabase.from("Transaction").insert({
+      date: new Date(data.tanggal),
+      categoryId: convertCategory.id,
+      walletId: sourceWallet.id,
+      amount: amount + sourceAdminFee,
+      type: "pengeluaran",
+      description: `Convert ke ${data.targetWallet}${sourceAdminFee > 0 ? ` (Biaya admin sumber: ${sourceAdminFee})` : ""}`,
+      status: "lunas",
+      sourceWalletId: sourceWallet.id,
+      targetWalletId: targetWallet.id,
     })
+
+    if (sourceTransactionError) {
+      throw sourceTransactionError
+    }
+
+    // 2. Create transaction for target wallet (pemasukan)
+    const { error: targetTransactionError } = await supabase.from("Transaction").insert({
+      date: new Date(data.tanggal),
+      categoryId: convertCategory.id,
+      walletId: targetWallet.id,
+      amount: amount - targetAdminFee,
+      type: "pemasukan",
+      description: `Convert dari ${data.sourceWallet}${targetAdminFee > 0 ? ` (Biaya admin tujuan: ${targetAdminFee})` : ""}`,
+      status: "lunas",
+      sourceWalletId: sourceWallet.id,
+      targetWalletId: targetWallet.id,
+    })
+
+    if (targetTransactionError) {
+      throw targetTransactionError
+    }
+
+    // 3. Update source wallet balance
+    const { error: sourceUpdateError } = await supabase
+      .from("Wallet")
+      .update({
+        balance: sourceWallet.balance - (amount + sourceAdminFee),
+      })
+      .eq("id", sourceWallet.id)
+
+    if (sourceUpdateError) {
+      throw sourceUpdateError
+    }
+
+    // 4. Update target wallet balance
+    const { error: targetUpdateError } = await supabase
+      .from("Wallet")
+      .update({
+        balance: targetWallet.balance + (amount - targetAdminFee),
+      })
+      .eq("id", targetWallet.id)
+
+    if (targetUpdateError) {
+      throw targetUpdateError
+    }
 
     // Revalidasi halaman
     revalidatePath("/")
@@ -235,42 +260,35 @@ export async function saveConvertTransaction(data: {
 export async function deleteTransaction(id: string) {
   try {
     // Dapatkan transaksi sebelum dihapus
-    const transaction = await prisma.transaction.findUnique({
-      where: { id },
-      include: { wallet: true },
-    })
+    const { data: transaction, error: getError } = await supabase
+      .from("Transaction")
+      .select("*, wallet:Wallet(*)")
+      .eq("id", id)
+      .single()
 
-    if (!transaction) {
+    if (getError || !transaction) {
       throw new Error("Transaksi tidak ditemukan")
     }
 
-    await prisma.$transaction(async (tx) => {
-      // Hapus transaksi
-      await tx.transaction.delete({
-        where: { id },
-      })
+    // Hapus transaksi
+    const { error: deleteError } = await supabase.from("Transaction").delete().eq("id", id)
 
-      // Update saldo wallet
-      if (transaction.type === "pemasukan") {
-        await tx.wallet.update({
-          where: { id: transaction.walletId },
-          data: {
-            balance: {
-              decrement: transaction.amount,
-            },
-          },
-        })
-      } else if (transaction.type === "pengeluaran") {
-        await tx.wallet.update({
-          where: { id: transaction.walletId },
-          data: {
-            balance: {
-              increment: transaction.amount,
-            },
-          },
-        })
-      }
-    })
+    if (deleteError) {
+      throw deleteError
+    }
+
+    // Update saldo wallet
+    const { error: updateError } = await supabase
+      .from("Wallet")
+      .update({
+        balance:
+          transaction.wallet.balance + (transaction.type === "pemasukan" ? -transaction.amount : transaction.amount),
+      })
+      .eq("id", transaction.walletId)
+
+    if (updateError) {
+      throw updateError
+    }
 
     // Revalidasi halaman
     revalidatePath("/")
@@ -287,116 +305,140 @@ export async function deleteTransaction(id: string) {
 export async function updateTransaction(data: any) {
   try {
     // Dapatkan transaksi asli
-    const originalTransaction = await prisma.transaction.findUnique({
-      where: { id: data.id },
-      include: { wallet: true },
-    })
+    const { data: originalTransaction, error: getError } = await supabase
+      .from("Transaction")
+      .select("*, wallet:Wallet(*)")
+      .eq("id", data.id)
+      .single()
 
-    if (!originalTransaction) {
+    if (getError || !originalTransaction) {
       throw new Error("Transaksi tidak ditemukan")
     }
 
     // Dapatkan kategori dan wallet
-    const category = await prisma.category.findFirst({
-      where: { name: data.kategori },
-    })
+    const { data: categories, error: categoryError } = await supabase
+      .from("Category")
+      .select("*")
+      .eq("name", data.kategori)
+      .limit(1)
 
-    const wallet = await prisma.wallet.findFirst({
-      where: { name: data.jenisTransaksi },
-    })
-
-    if (!category || !wallet) {
-      throw new Error("Kategori atau wallet tidak ditemukan")
+    if (categoryError || !categories || categories.length === 0) {
+      throw new Error("Kategori tidak ditemukan")
     }
+
+    const { data: wallets, error: walletError } = await supabase
+      .from("Wallet")
+      .select("*")
+      .eq("name", data.jenisTransaksi)
+      .limit(1)
+
+    if (walletError || !wallets || wallets.length === 0) {
+      throw new Error("Wallet tidak ditemukan")
+    }
+
+    const category = categories[0]
+    const wallet = wallets[0]
 
     const newAmount = Number(data.pemasukan) || Number(data.pengeluaran)
     const newType = Number(data.pemasukan) > 0 ? "pemasukan" : "pengeluaran"
 
-    await prisma.$transaction(async (tx) => {
-      // Update transaksi
-      await tx.transaction.update({
-        where: { id: data.id },
-        data: {
-          date: new Date(data.tanggal),
-          categoryId: category.id,
-          walletId: wallet.id,
-          amount: newAmount,
-          type: newType,
-          description: data.deskripsi,
-          status: data.status,
-        },
+    // Update transaksi
+    const { error: updateError } = await supabase
+      .from("Transaction")
+      .update({
+        date: new Date(data.tanggal),
+        categoryId: category.id,
+        walletId: wallet.id,
+        amount: newAmount,
+        type: newType,
+        description: data.deskripsi,
+        status: data.status,
       })
+      .eq("id", data.id)
 
-      // Update saldo wallet jika wallet sama
-      if (originalTransaction.walletId === wallet.id) {
-        // Kembalikan saldo lama
-        let balanceAdjustment = 0
-        if (originalTransaction.type === "pemasukan") {
-          balanceAdjustment -= originalTransaction.amount
-        } else {
-          balanceAdjustment += originalTransaction.amount
-        }
+    if (updateError) {
+      throw updateError
+    }
 
-        // Tambahkan saldo baru
-        if (newType === "pemasukan") {
-          balanceAdjustment += newAmount
-        } else {
-          balanceAdjustment -= newAmount
-        }
-
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: {
-            balance: {
-              increment: balanceAdjustment,
-            },
-          },
-        })
+    // Update saldo wallet jika wallet sama
+    if (originalTransaction.walletId === wallet.id) {
+      // Kembalikan saldo lama
+      let balanceAdjustment = 0
+      if (originalTransaction.type === "pemasukan") {
+        balanceAdjustment -= originalTransaction.amount
       } else {
-        // Wallet berbeda, update keduanya
-        // Kembalikan saldo wallet lama
-        if (originalTransaction.type === "pemasukan") {
-          await tx.wallet.update({
-            where: { id: originalTransaction.walletId },
-            data: {
-              balance: {
-                decrement: originalTransaction.amount,
-              },
-            },
-          })
-        } else {
-          await tx.wallet.update({
-            where: { id: originalTransaction.walletId },
-            data: {
-              balance: {
-                increment: originalTransaction.amount,
-              },
-            },
-          })
-        }
+        balanceAdjustment += originalTransaction.amount
+      }
 
-        // Update saldo wallet baru
-        if (newType === "pemasukan") {
-          await tx.wallet.update({
-            where: { id: wallet.id },
-            data: {
-              balance: {
-                increment: newAmount,
-              },
-            },
+      // Tambahkan saldo baru
+      if (newType === "pemasukan") {
+        balanceAdjustment += newAmount
+      } else {
+        balanceAdjustment -= newAmount
+      }
+
+      const { error: walletUpdateError } = await supabase
+        .from("Wallet")
+        .update({
+          balance: wallet.balance + balanceAdjustment,
+        })
+        .eq("id", wallet.id)
+
+      if (walletUpdateError) {
+        throw walletUpdateError
+      }
+    } else {
+      // Wallet berbeda, update keduanya
+      // Kembalikan saldo wallet lama
+      if (originalTransaction.type === "pemasukan") {
+        const { error: oldWalletError } = await supabase
+          .from("Wallet")
+          .update({
+            balance: originalTransaction.wallet.balance - originalTransaction.amount,
           })
-        } else {
-          await tx.wallet.update({
-            where: { id: wallet.id },
-            data: {
-              balance: {
-                decrement: newAmount,
-              },
-            },
+          .eq("id", originalTransaction.walletId)
+
+        if (oldWalletError) {
+          throw oldWalletError
+        }
+      } else {
+        const { error: oldWalletError } = await supabase
+          .from("Wallet")
+          .update({
+            balance: originalTransaction.wallet.balance + originalTransaction.amount,
           })
+          .eq("id", originalTransaction.walletId)
+
+        if (oldWalletError) {
+          throw oldWalletError
         }
       }
-    })
+
+      // Update saldo wallet baru
+      if (newType === "pemasukan") {
+        const { error: newWalletError } = await supabase
+          .from("Wallet")
+          .update({
+            balance: wallet.balance + newAmount,
+          })
+          .eq("id", wallet.id)
+
+        if (newWalletError) {
+          throw newWalletError
+        }
+      } else {
+        const { error: newWalletError } = await supabase
+          .from("Wallet")
+          .update({
+            balance: wallet.balance - newAmount,
+          })
+          .eq("id", wallet.id)
+
+        if (newWalletError) {
+          throw newWalletError
+        }
+      }
+    }
 
     // Revalidasi halaman
     revalidatePath("/")
@@ -413,10 +455,18 @@ export async function updateTransaction(data: any) {
 export async function getSummary() {
   try {
     // Dapatkan semua transaksi
-    const transactions = await prisma.transaction.findMany()
+    const { data: transactions, error: transactionError } = await supabase.from("Transaction").select("*")
+
+    if (transactionError) {
+      throw transactionError
+    }
 
     // Dapatkan semua wallet
-    const wallets = await prisma.wallet.findMany()
+    const { data: wallets, error: walletError } = await supabase.from("Wallet").select("*")
+
+    if (walletError) {
+      throw walletError
+    }
 
     // Hitung total pemasukan dan pengeluaran
     let totalPemasukan = 0
@@ -458,7 +508,11 @@ export async function getSummary() {
 // Fungsi untuk mendapatkan wallet
 export async function getWallets() {
   try {
-    const wallets = await prisma.wallet.findMany()
+    const { data: wallets, error } = await supabase.from("Wallet").select("*")
+
+    if (error) {
+      throw error
+    }
 
     return wallets.map((wallet) => ({
       id: wallet.id,
@@ -478,7 +532,11 @@ export async function getWallets() {
 // Fungsi untuk mendapatkan kategori
 export async function getCategories() {
   try {
-    const categories = await prisma.category.findMany()
+    const { data: categories, error } = await supabase.from("Category").select("*")
+
+    if (error) {
+      throw error
+    }
 
     return categories.map((category) => ({
       id: category.id,
@@ -498,94 +556,82 @@ export async function getCategories() {
 export async function updateSettings(type: "wallets" | "categories", data: any[]) {
   try {
     if (type === "wallets") {
-      // Hapus semua wallet yang ada terlebih dahulu
-      await prisma.wallet.deleteMany({
-        where: {
-          // Hanya hapus wallet yang tidak memiliki transaksi
-          transactions: {
-            none: {},
-          },
-        },
-      })
+      // Get existing wallets with transactions
+      const { data: existingWallets, error: existingError } = await supabase
+        .from("Wallet")
+        .select("id, transactions:Transaction(count)")
 
-      // Buat wallet baru atau update yang sudah ada
+      if (existingError) {
+        throw existingError
+      }
+
+      // Identify wallets that can be safely deleted (no transactions)
+      const walletsWithoutTransactions = existingWallets
+        .filter((w) => !w.transactions || w.transactions.length === 0)
+        .map((w) => w.id)
+
+      // Delete wallets without transactions
+      if (walletsWithoutTransactions.length > 0) {
+        const { error: deleteError } = await supabase.from("Wallet").delete().in("id", walletsWithoutTransactions)
+
+        if (deleteError) {
+          throw deleteError
+        }
+      }
+
+      // Upsert wallets
       for (const wallet of data) {
-        if (wallet.id) {
-          await prisma.wallet.upsert({
-            where: { id: wallet.id },
-            update: {
-              name: wallet.name,
-              icon: wallet.icon,
-              color: wallet.color,
-              balance: Number(wallet.balance),
-              type: wallet.type,
-              description: wallet.description,
-            },
-            create: {
-              id: wallet.id,
-              name: wallet.name,
-              icon: wallet.icon,
-              color: wallet.color,
-              balance: Number(wallet.balance),
-              type: wallet.type,
-              description: wallet.description,
-            },
-          })
-        } else {
-          await prisma.wallet.create({
-            data: {
-              name: wallet.name,
-              icon: wallet.icon,
-              color: wallet.color,
-              balance: Number(wallet.balance),
-              type: wallet.type,
-              description: wallet.description,
-            },
-          })
+        const { error: upsertError } = await supabase.from("Wallet").upsert({
+          id: wallet.id,
+          name: wallet.name,
+          icon: wallet.icon,
+          color: wallet.color,
+          balance: Number(wallet.balance),
+          type: wallet.type,
+          description: wallet.description,
+        })
+
+        if (upsertError) {
+          throw upsertError
         }
       }
     } else if (type === "categories") {
-      // Hapus semua kategori yang ada terlebih dahulu
-      await prisma.category.deleteMany({
-        where: {
-          // Hanya hapus kategori yang tidak memiliki transaksi
-          transactions: {
-            none: {},
-          },
-        },
-      })
+      // Get existing categories with transactions
+      const { data: existingCategories, error: existingError } = await supabase
+        .from("Category")
+        .select("id, transactions:Transaction(count)")
 
-      // Buat kategori baru atau update yang sudah ada
+      if (existingError) {
+        throw existingError
+      }
+
+      // Identify categories that can be safely deleted (no transactions)
+      const categoriesWithoutTransactions = existingCategories
+        .filter((c) => !c.transactions || c.transactions.length === 0)
+        .map((c) => c.id)
+
+      // Delete categories without transactions
+      if (categoriesWithoutTransactions.length > 0) {
+        const { error: deleteError } = await supabase.from("Category").delete().in("id", categoriesWithoutTransactions)
+
+        if (deleteError) {
+          throw deleteError
+        }
+      }
+
+      // Upsert categories
       for (const category of data) {
-        if (category.id) {
-          await prisma.category.upsert({
-            where: { id: category.id },
-            update: {
-              name: category.name,
-              color: category.color,
-              type: category.type,
-              icon: category.icon,
-              description: category.description,
-            },
-            create: {
-              id: category.id,
-              name: category.name,
-              color: category.color,
-              type: category.type,
-              icon: category.icon,
-              description: category.description,
-            },
-          })
-        } else {
-          await prisma.category.create({
-            data: {
-              name: category.name,
-              color: category.color,
-              type: category.type,
-              icon: category.icon,
-              description: category.description,
-            },
-          })
+        const { error: upsertError } = await supabase.from("Category").upsert({
+          id: category.id,
+          name: category.name,
+          color: category.color,
+          type: category.type,
+          icon: category.icon,
+          description: category.description,
+        })
+
+        if (upsertError) {
+          throw upsertError
         }
       }
     }
@@ -601,35 +647,54 @@ export async function updateSettings(type: "wallets" | "categories", data: any[]
   }
 }
 
-// Perbaiki fungsi initializeDefaultData
+// Fungsi initializeDefaultData
 export async function initializeDefaultData() {
   try {
     // Periksa apakah sudah ada data
-    const categoryCount = await prisma.category.count()
-    const walletCount = await prisma.wallet.count()
+    const { count: categoryCount, error: categoryError } = await supabase
+      .from("Category")
+      .select("*", { count: "exact", head: true })
+
+    if (categoryError) {
+      throw categoryError
+    }
+
+    const { count: walletCount, error: walletError } = await supabase
+      .from("Wallet")
+      .select("*", { count: "exact", head: true })
+
+    if (walletError) {
+      throw walletError
+    }
 
     if (categoryCount === 0) {
       // Buat kategori default
-      await prisma.category.createMany({
-        data: DEFAULT_CATEGORIES.map((cat) => ({
+      const { error } = await supabase.from("Category").insert(
+        DEFAULT_CATEGORIES.map((cat) => ({
           ...cat,
           createdAt: new Date(),
           updatedAt: new Date(),
         })),
-        skipDuplicates: true,
-      })
+      )
+
+      if (error) {
+        throw error
+      }
     }
 
     if (walletCount === 0) {
       // Buat wallet default
-      await prisma.wallet.createMany({
-        data: DEFAULT_WALLETS.map((wallet) => ({
+      const { error } = await supabase.from("Wallet").insert(
+        DEFAULT_WALLETS.map((wallet) => ({
           ...wallet,
           createdAt: new Date(),
           updatedAt: new Date(),
         })),
-        skipDuplicates: true,
-      })
+      )
+
+      if (error) {
+        throw error
+      }
     }
 
     return { success: true }

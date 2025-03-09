@@ -1,32 +1,45 @@
-import { prisma, withErrorHandling, getCached, setCache } from "../db-utils"
-import type { Transaction } from "@prisma/client"
+import { prisma } from "@/lib/db"
+import { format } from "date-fns"
 
 export class TransactionService {
-  // Get transactions with caching
   static async getTransactions(filter = "semua", sortBy = "tanggal", order: "asc" | "desc" = "desc") {
-    const cacheKey = `transactions:${filter}:${sortBy}:${order}`
-    const cached = getCached<Transaction[]>(cacheKey)
-    if (cached) return cached
-
-    return await withErrorHandling(async () => {
+    try {
       let whereClause = {}
 
       if (filter === "bulan-ini") {
         const now = new Date()
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
         whereClause = {
           date: {
-            gte: new Date(now.getFullYear(), now.getMonth(), 1),
-            lte: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+            gte: startOfMonth,
+            lte: endOfMonth,
           },
         }
       } else if (filter === "bulan-lalu") {
         const now = new Date()
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+
         whereClause = {
           date: {
-            gte: new Date(now.getFullYear(), now.getMonth() - 1, 1),
-            lte: new Date(now.getFullYear(), now.getMonth(), 0),
+            gte: startOfLastMonth,
+            lte: endOfMonth,
           },
         }
+      }
+
+      // Tentukan pengurutan
+      let orderBy = {}
+      if (sortBy === "tanggal") {
+        orderBy = { date: order }
+      } else if (sortBy === "nominal") {
+        orderBy = { amount: order }
+      } else if (sortBy === "kategori") {
+        orderBy = { category: { name: order } }
+      } else if (sortBy === "jenisTransaksi") {
+        orderBy = { wallet: { name: order } }
       }
 
       const transactions = await prisma.transaction.findMany({
@@ -34,50 +47,64 @@ export class TransactionService {
         include: {
           category: true,
           wallet: true,
-          sourceWallet: true,
-          targetWallet: true,
         },
-        orderBy: {
-          [sortBy === "tanggal" ? "date" : sortBy === "nominal" ? "amount" : "date"]: order,
-        },
+        orderBy,
       })
 
-      setCache(cacheKey, transactions)
-      return transactions
-    }, "Failed to fetch transactions")
+      // Format untuk frontend
+      return transactions.map((tx) => ({
+        id: tx.id,
+        tanggal: format(tx.date, "yyyy-MM-dd"),
+        kategori: tx.category.name,
+        jenisTransaksi: tx.wallet.name,
+        pemasukan: tx.type === "pemasukan" ? tx.amount.toString() : "0",
+        pengeluaran: tx.type === "pengeluaran" ? tx.amount.toString() : "0",
+        deskripsi: tx.description || "",
+        status: tx.status,
+        timestamp: tx.createdAt.toISOString(),
+      }))
+    } catch (error) {
+      console.error("Error fetching transactions:", error)
+      throw new Error("Gagal mengambil data transaksi")
+    }
   }
 
-  // Create transaction with proper error handling and validation
   static async createTransaction(data: any) {
-    return await withErrorHandling(async () => {
-      const { category, wallet, amount, type, description, status, date } = data
+    try {
+      const { tanggal, kategori, jenisTransaksi, pemasukan, pengeluaran, deskripsi, status } = data
 
-      // Validate category and wallet
-      const [categoryExists, walletExists] = await Promise.all([
-        prisma.category.findFirst({ where: { id: category.id, isActive: true } }),
-        prisma.wallet.findFirst({ where: { id: wallet.id, isActive: true } }),
-      ])
+      // Dapatkan kategori dan wallet
+      const category = await prisma.category.findFirst({
+        where: { name: kategori },
+      })
 
-      if (!categoryExists || !walletExists) {
-        throw new Error("Invalid category or wallet")
+      const wallet = await prisma.wallet.findFirst({
+        where: { name: jenisTransaksi },
+      })
+
+      if (!category || !wallet) {
+        throw new Error("Kategori atau wallet tidak ditemukan")
       }
 
-      // Create transaction in a transaction block
+      // Buat transaksi
+      const amount = Number(pemasukan) || Number(pengeluaran)
+      const type = Number(pemasukan) > 0 ? "pemasukan" : "pengeluaran"
+
       return await prisma.$transaction(async (tx) => {
-        // Create the transaction
+        // Buat transaksi
         const transaction = await tx.transaction.create({
           data: {
-            date: new Date(date),
+            date: new Date(tanggal),
             categoryId: category.id,
             walletId: wallet.id,
-            amount: Number.parseFloat(amount),
+            amount,
             type,
-            description,
+            description: deskripsi,
             status,
           },
         })
 
-        // Update wallet balance
+        // Update saldo wallet
         await tx.wallet.update({
           where: { id: wallet.id },
           data: {
@@ -89,69 +116,10 @@ export class TransactionService {
 
         return transaction
       })
-    }, "Failed to create transaction")
-  }
-
-  // Delete transaction safely
-  static async deleteTransaction(id: string) {
-    return await withErrorHandling(async () => {
-      const transaction = await prisma.transaction.findUnique({
-        where: { id },
-        include: { wallet: true },
-      })
-
-      if (!transaction) {
-        throw new Error("Transaction not found")
-      }
-
-      await prisma.$transaction(async (tx) => {
-        // Delete the transaction
-        await tx.transaction.delete({
-          where: { id },
-        })
-
-        // Reverse the balance change
-        await tx.wallet.update({
-          where: { id: transaction.walletId },
-          data: {
-            balance: {
-              increment: transaction.type === "pemasukan" ? -transaction.amount : transaction.amount,
-            },
-          },
-        })
-      })
-
-      return true
-    }, "Failed to delete transaction")
-  }
-
-  // Get summary statistics
-  static async getSummary() {
-    return await withErrorHandling(async () => {
-      const [transactions, wallets] = await Promise.all([
-        prisma.transaction.findMany(),
-        prisma.wallet.findMany({ where: { isActive: true } }),
-      ])
-
-      const totalPemasukan = transactions.filter((t) => t.type === "pemasukan").reduce((sum, t) => sum + t.amount, 0)
-
-      const totalPengeluaran = transactions
-        .filter((t) => t.type === "pengeluaran")
-        .reduce((sum, t) => sum + t.amount, 0)
-
-      return {
-        totalPemasukan,
-        totalPengeluaran,
-        saldoTotal: totalPemasukan - totalPengeluaran,
-        wallets: wallets.map((w) => ({
-          id: w.id,
-          name: w.name,
-          balance: w.balance,
-          color: w.color,
-          icon: w.icon,
-        })),
-      }
-    }, "Failed to get summary")
+    } catch (error) {
+      console.error("Error saving transaction:", error)
+      throw new Error("Gagal menyimpan transaksi")
+    }
   }
 }
 

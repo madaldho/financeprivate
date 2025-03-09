@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -19,6 +19,28 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("semua")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [dbStatus, setDbStatus] = useState<"loading" | "connected" | "error">("loading")
+
+  useEffect(() => {
+    async function checkDbConnection() {
+      try {
+        setDbStatus("loading")
+        const response = await fetch("/api/db-test")
+        const data = await response.json()
+
+        if (data.success) {
+          setDbStatus("connected")
+        } else {
+          setDbStatus("error")
+        }
+      } catch (error) {
+        console.error("Error checking DB connection:", error)
+        setDbStatus("error")
+      }
+    }
+
+    checkDbConnection()
+  }, [])
 
   const handleTransactionSuccess = async () => {
     // Refresh data
@@ -46,6 +68,24 @@ export default function Home() {
       <LoadingOverlay isLoading={isLoading} />
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Manajemen Keuangan Pribadi</h1>
+        {dbStatus === "loading" && (
+          <div className="bg-yellow-50 text-yellow-800 px-4 py-2 rounded-md mb-4 flex items-center">
+            <span className="animate-pulse mr-2">⏳</span>
+            <span>Memeriksa koneksi database...</span>
+          </div>
+        )}
+        {dbStatus === "connected" && (
+          <div className="bg-green-50 text-green-800 px-4 py-2 rounded-md mb-4 flex items-center">
+            <span className="mr-2">✅</span>
+            <span>Terhubung ke database Supabase</span>
+          </div>
+        )}
+        {dbStatus === "error" && (
+          <div className="bg-red-50 text-red-800 px-4 py-2 rounded-md mb-4 flex items-center">
+            <span className="mr-2">❌</span>
+            <span>Gagal terhubung ke database. Silakan periksa konfigurasi.</span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Link href="/insights">
             <Button variant="outline" size="icon">

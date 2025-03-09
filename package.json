@@ -62,9 +62,12 @@
     "prisma": "latest",
     "typescript": "latest",
     "framer-motion": "latest",
-    "googleapis": "latest",
     "@prisma/client": "latest",
-    "xlsx": "latest"
+    "xlsx": "latest",
+    "child_process": "latest",
+    "fs": "latest",
+    "path": "latest",
+    "@supabase/supabase-js": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
