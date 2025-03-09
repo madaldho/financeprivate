@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Trash2, GripVertical } from "lucide-react"
-import type { WalletBalance } from "@/lib/sheet-config"
-import { DEFAULT_WALLETS } from "@/lib/sheet-config"
-import { getWallets, updateSettings } from "@/lib/sheet-actions"
+import type { WalletBalance } from "@/lib/types"
+import { DEFAULT_WALLETS } from "@/lib/default-data"
+import { getWallets, updateSettings } from "@/lib/actions"
 
 const WALLET_TYPES = [
   { value: "cash", label: "Cash" },

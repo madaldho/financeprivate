@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Trash2, GripVertical } from "lucide-react"
-import type { Category } from "@/lib/sheet-config"
-import { DEFAULT_CATEGORIES } from "@/lib/sheet-config"
-import { getCategories, updateSettings } from "@/lib/sheet-actions"
+import type { Category } from "@/lib/types"
+import { DEFAULT_CATEGORIES } from "@/lib/default-data"
+import { getCategories, updateSettings } from "@/lib/actions"
 
 export function CategorySettings() {
   const [categories, setCategories] = useState<Category[]>([])
