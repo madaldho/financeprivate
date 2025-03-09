@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { DataRecovery } from "@/components/data-recovery"
+import { InitData } from "@/components/init-data"
 
 export const metadata: Metadata = {
   title: "Manajemen Keuangan Pribadi",
@@ -21,6 +22,7 @@ export default function RootLayout({
         <ErrorBoundary>
           <DataRecovery />
           {children}
+          <InitData />
         </ErrorBoundary>
       </body>
     </html>

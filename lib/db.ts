@@ -4,17 +4,40 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ["query", "error", "warn"],
+const prismaClientSingleton = () => {
+  return new PrismaClient({
+    log: ["error", "warn"],
+  }).$extends({
+    result: {
+      transaction: {
+        amount: {
+          needs: {},
+          compute(transaction) {
+            // Ensure amount is always a number
+            return Number(transaction.amount)
+          },
+        },
+      },
+      wallet: {
+        balance: {
+          needs: {},
+          compute(wallet) {
+            // Ensure balance is always a number
+            return Number(wallet.balance)
+          },
+        },
+      },
+    },
   })
+}
+
+export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma
 }
 
-// Tambahkan error handler
+// Add error handler
 prisma.$on("error", (e) => {
   console.error("Prisma Error:", e)
 })
