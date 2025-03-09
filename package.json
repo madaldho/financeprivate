@@ -63,8 +63,8 @@
     "typescript": "latest",
     "framer-motion": "latest",
     "googleapis": "latest",
-    "xlsx": "latest",
-    "@prisma/client": "latest"
+    "@prisma/client": "latest",
+    "xlsx": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

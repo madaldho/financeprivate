@@ -150,7 +150,7 @@ export function TransactionTable({ filter, onError }: TransactionTableProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <TransactionSort onSort={handleSort} />
+        <TransactionSort onSort={handleSort} currentSort={{ by: sortBy, order: sortOrder }} />
       </div>
 
       <div className="rounded-md border overflow-hidden">

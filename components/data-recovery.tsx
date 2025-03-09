@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-// Hapus fungsi recoverData karena tidak lagi diperlukan
 
 export function DataRecovery() {
   const [isRecovering, setIsRecovering] = useState(false)
@@ -29,7 +28,7 @@ export function DataRecovery() {
     <div className="relative">
       <div className="absolute top-0 right-0">
         <Button variant="ghost" size="sm" onClick={handleRecoverData} disabled={isRecovering}>
-          {isRecovering ? "Memulihkan..." : "Refresh Data"}
+          {isRecovering ? "Memuat ulang..." : "Refresh Data"}
         </Button>
       </div>
       {message && (
