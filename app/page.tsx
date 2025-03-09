@@ -12,6 +12,7 @@ import { FinanceSummary } from "@/components/finance-summary"
 import { WalletCards } from "@/components/wallet-cards"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { LoadingOverlay } from "@/components/loading-overlay"
+import { InitializeButton } from "@/components/initialize-button"
 import Link from "next/link"
 
 export default function Home() {
@@ -200,6 +201,8 @@ export default function Home() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <InitializeButton />
     </main>
   )
 }
