@@ -7,13 +7,13 @@ import { DatePickerWithRange } from "@/components/date-range-picker"
 import { TransactionChart } from "@/components/insights/transaction-chart"
 import { CategoryDistribution } from "@/components/insights/category-distribution"
 import { WalletDistribution } from "@/components/insights/wallet-distribution"
-import { MonthlyComparison } from "@/components/insights/monthly-comparison"
 import { WeeklyTrends } from "@/components/insights/weekly-trends"
 import { TopTransactions } from "@/components/insights/top-transactions"
 import { SpendingPatterns } from "@/components/insights/spending-patterns"
+import { ExportData } from "@/components/export-data"
 import { Activity, ArrowUpCircle, ArrowDownCircle } from "lucide-react"
 import { LoadingState } from "@/components/loading-state"
-import { getTransactions, getSummary } from "@/lib/sheet-actions"
+import { getSummary } from "@/lib/actions"
 import { format } from "date-fns"
 import { id } from "date-fns/locale"
 
@@ -50,45 +50,6 @@ export default function InsightsPage() {
       // Get summary data
       const summaryData = await getSummary()
       setSummary(summaryData)
-
-      // Get transactions for the selected date range
-      const transactions = await getTransactions()
-
-      // Filter transactions based on date range
-      const filteredTransactions = transactions.filter((t) => {
-        const date = new Date(t.tanggal)
-        return date >= dateRange.from && date <= dateRange.to
-      })
-
-      // Calculate period comparison
-      const previousPeriodStart = new Date(dateRange.from)
-      previousPeriodStart.setDate(previousPeriodStart.getDate() - 30)
-      const previousPeriodEnd = new Date(dateRange.to)
-      previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 30)
-
-      const previousTransactions = transactions.filter((t) => {
-        const date = new Date(t.tanggal)
-        return date >= previousPeriodStart && date <= previousPeriodEnd
-      })
-
-      // Calculate percentage changes
-      const currentPemasukan = filteredTransactions.reduce((sum, t) => sum + Number(t.pemasukan), 0)
-      const previousPemasukan = previousTransactions.reduce((sum, t) => sum + Number(t.pemasukan), 0)
-      const pemasukanChange = previousPemasukan ? ((currentPemasukan - previousPemasukan) / previousPemasukan) * 100 : 0
-
-      const currentPengeluaran = filteredTransactions.reduce((sum, t) => sum + Number(t.pengeluaran), 0)
-      const previousPengeluaran = previousTransactions.reduce((sum, t) => sum + Number(t.pengeluaran), 0)
-      const pengeluaranChange = previousPengeluaran
-        ? ((currentPengeluaran - previousPengeluaran) / previousPengeluaran) * 100
-        : 0
-
-      setSummary((prev) => ({
-        ...prev,
-        periodComparison: {
-          pemasukanChange,
-          pengeluaranChange,
-        },
-      }))
     } catch (err) {
       console.error("Error loading data:", err)
       setError("Gagal memuat data. Silakan coba lagi.")
@@ -201,42 +162,41 @@ export default function InsightsPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Tren Transaksi</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <TransactionChart dateRange={dateRange} />
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Tren Transaksi</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                <TransactionChart dateRange={dateRange} />
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Distribusi Kategori</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <CategoryDistribution dateRange={dateRange} />
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">Distribusi Kategori</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                <CategoryDistribution dateRange={dateRange} />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Distribusi Wallet</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <WalletDistribution dateRange={dateRange} />
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <ExportData />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Perbandingan Bulanan</CardTitle>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <MonthlyComparison />
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Distribusi Wallet</CardTitle>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+              <WalletDistribution dateRange={dateRange} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {view === "detailed" && (
