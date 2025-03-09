@@ -29,16 +29,16 @@ export function WalletCards() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-xl" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-32 rounded-xl" />
         ))}
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {wallets.map((wallet, index) => (
         <motion.div
           key={wallet.id}
@@ -46,26 +46,19 @@ export function WalletCards() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: index * 0.1 }}
         >
-          <Card
-            className="relative overflow-hidden h-24 rounded-xl border-0 shadow-md hover:shadow-lg transition-shadow"
-            style={{
-              background: `linear-gradient(135deg, ${wallet.color}15, ${wallet.color}30)`,
-            }}
-          >
-            <div className="absolute inset-0 p-3 flex flex-col justify-between">
+          <Card className="relative overflow-hidden h-32 rounded-xl border shadow-sm hover:shadow-md transition-shadow">
+            <div className="absolute inset-0 opacity-10" style={{ backgroundColor: wallet.color }} />
+            <div className="relative h-full p-4 flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  {wallet.icon && (
-                    <span className="text-lg" role="img" aria-label={wallet.name}>
-                      {wallet.icon}
-                    </span>
-                  )}
-                  <span className="font-medium text-sm truncate" style={{ color: wallet.color }}>
-                    {wallet.name}
+                  <span className="text-2xl" role="img" aria-label={wallet.name}>
+                    {wallet.icon}
                   </span>
+                  <span className="font-medium text-sm">{wallet.name}</span>
                 </div>
+                <span className="text-xs px-2 py-1 rounded-full bg-gray-100">{wallet.type}</span>
               </div>
-              <div className="text-lg font-bold truncate" style={{ color: wallet.color }}>
+              <div className="text-xl font-bold">
                 {new Intl.NumberFormat("id-ID", {
                   style: "currency",
                   currency: "IDR",
