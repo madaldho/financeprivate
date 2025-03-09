@@ -59,10 +59,14 @@ export function TransactionTable({ filter, onError }: TransactionTableProps) {
     }
   }
 
+  const refreshData = () => {
+    fetchTransactions()
+  }
+
   const handleDelete = async (id: string) => {
     try {
       await deleteTransaction(id)
-      setTransactions(transactions.filter((t) => t.id !== id))
+      refreshData() // Refresh data after deletion
       toast({
         title: "Berhasil",
         description: "Transaksi berhasil dihapus",

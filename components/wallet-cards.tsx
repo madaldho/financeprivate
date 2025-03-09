@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getWallets } from "@/lib/sheet-actions"
-import { type WalletBalance, WALLET_COLORS, WALLET_ICONS } from "@/lib/sheet-config"
+import type { WalletBalance } from "@/lib/types"
+import { motion } from "framer-motion"
 
 export function WalletCards() {
   const [wallets, setWallets] = useState<WalletBalance[]>([])
@@ -28,7 +29,7 @@ export function WalletCards() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {[1, 2, 3, 4, 5].map((i) => (
           <Skeleton key={i} className="h-24 w-full rounded-xl" />
         ))}
@@ -37,42 +38,44 @@ export function WalletCards() {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-      {wallets.map((wallet) => {
-        const walletName = wallet.name.toUpperCase()
-        const bgColor = WALLET_COLORS[walletName] || WALLET_COLORS.default
-        const logoUrl = WALLET_ICONS[walletName]
-
-        return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      {wallets.map((wallet, index) => (
+        <motion.div
+          key={wallet.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: index * 0.1 }}
+        >
           <Card
-            key={wallet.id}
-            className="overflow-hidden rounded-xl border-0 shadow-md"
+            className="relative overflow-hidden h-24 rounded-xl border-0 shadow-md hover:shadow-lg transition-shadow"
             style={{
-              background: `linear-gradient(135deg, ${bgColor}20, ${bgColor}40)`,
-              borderColor: bgColor,
+              background: `linear-gradient(135deg, ${wallet.color}15, ${wallet.color}30)`,
             }}
           >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                {logoUrl ? (
-                  <img src={logoUrl || "/placeholder.svg"} alt={wallet.name} className="h-8 w-auto object-contain" />
-                ) : (
-                  <span className="font-medium text-lg" style={{ color: bgColor }}>
+            <div className="absolute inset-0 p-3 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {wallet.icon && (
+                    <span className="text-lg" role="img" aria-label={wallet.name}>
+                      {wallet.icon}
+                    </span>
+                  )}
+                  <span className="font-medium text-sm truncate" style={{ color: wallet.color }}>
                     {wallet.name}
                   </span>
-                )}
+                </div>
               </div>
-              <div className="text-xl font-bold" style={{ color: bgColor }}>
+              <div className="text-lg font-bold truncate" style={{ color: wallet.color }}>
                 {new Intl.NumberFormat("id-ID", {
                   style: "currency",
                   currency: "IDR",
                   minimumFractionDigits: 0,
                 }).format(wallet.balance)}
               </div>
-            </CardContent>
+            </div>
           </Card>
-        )
-      })}
+        </motion.div>
+      ))}
     </div>
   )
 }

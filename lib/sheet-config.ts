@@ -15,39 +15,12 @@ export const SHEET_STRUCTURE = {
   },
   WALLETS: {
     name: "Dompet",
-    columns: ["ID", "Nama", "Icon", "Warna", "Saldo"],
+    columns: ["ID", "Nama", "Icon", "Warna", "Saldo", "Tipe", "Keterangan"],
   },
   CATEGORIES: {
     name: "Kategori",
-    columns: ["ID", "Nama", "Warna", "Tipe"],
+    columns: ["ID", "Nama", "Warna", "Tipe", "Icon", "Keterangan"],
   },
-}
-
-export type WalletBalance = {
-  id: string
-  name: string
-  icon?: string
-  color: string
-  balance: number
-}
-
-export type Category = {
-  id: string
-  name: string
-  color: string
-  type: "pemasukan" | "pengeluaran" | "transfer"
-}
-
-export type Transaction = {
-  id: string
-  tanggal: string
-  kategori: string
-  jenisTransaksi: string
-  pemasukan: string
-  pengeluaran: string
-  deskripsi: string
-  status: string
-  timestamp: string
 }
 
 export const WALLET_ICONS = {
@@ -65,12 +38,9 @@ export const WALLET_COLORS = {
   SHOPEEPAY: "#ee4d2d",
   LINKAJA: "#fe0000",
   CASH: "#2e7d32",
-  "SALDO LIVIN": "#0288d1",
-  FLIP: "#01bef0",
   BSI: "#8bc34a",
   "JAGO AYANG": "#ff9800",
-  "JAGO ME": "#ff5722",
-  JENIUS: "#3f51b5",
+  JAGO: "#ff5722",
   SEABANK: "#e91e63",
   default: "#757575",
 }
@@ -89,4 +59,39 @@ export const CATEGORY_COLORS = {
   LAINNYA: "#607d8b",
   default: "#757575",
 }
+
+export type WalletBalance = {
+  id: string
+  name: string
+  icon?: string
+  color: string
+  balance: number
+  type?: string
+  description?: string
+}
+
+export type Category = {
+  id: string
+  name: string
+  color: string
+  type: "pemasukan" | "pengeluaran" | "transfer" | "convert"
+  icon?: string
+  description?: string
+}
+
+export type Transaction = {
+  id: string
+  tanggal: string
+  kategori: string
+  jenisTransaksi: string
+  pemasukan: string
+  pengeluaran: string
+  deskripsi: string
+  status: string
+  timestamp: string
+}
+
+// Import default data from separate file
+import { DEFAULT_CATEGORIES, DEFAULT_WALLETS } from "./default-data"
+export { DEFAULT_CATEGORIES, DEFAULT_WALLETS }
 

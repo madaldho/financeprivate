@@ -12,6 +12,7 @@ import * as z from "zod"
 import { saveTransaction, getCategories, getWallets } from "@/lib/sheet-actions"
 import { DialogClose } from "@/components/ui/dialog"
 import type { Category, WalletBalance } from "@/lib/sheet-config"
+import { TransactionSuccess } from "./transaction-success"
 
 const formSchema = z.object({
   tanggal: z.string().min(1, { message: "Tanggal wajib diisi" }),
@@ -32,6 +33,12 @@ export function TransactionForm({ type, onSuccess }: TransactionFormProps) {
   const [wallets, setWallets] = useState<WalletBalance[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [transactionData, setTransactionData] = useState<{
+    amount: number
+    category: string
+    wallet: string
+  } | null>(null)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -81,8 +88,23 @@ export function TransactionForm({ type, onSuccess }: TransactionFormProps) {
       // Simpan ke spreadsheet
       await saveTransaction(transactionData)
 
+      // Set transaction data for success animation
+      setTransactionData({
+        amount: Number(values.nominal),
+        category: values.kategori,
+        wallet: values.jenisTransaksi,
+      })
+
+      // Show success animation
+      setShowSuccess(true)
+
+      // Reset form
       form.reset()
-      onSuccess()
+
+      // Call onSuccess after a delay to allow animation to play
+      setTimeout(() => {
+        onSuccess()
+      }, 500)
     } catch (error) {
       console.error("Error saving transaction:", error)
       setError("Terjadi kesalahan saat menyimpan transaksi")
@@ -92,146 +114,158 @@ export function TransactionForm({ type, onSuccess }: TransactionFormProps) {
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {error && <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">{error}</div>}
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          {error && <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">{error}</div>}
 
-        <FormField
-          control={form.control}
-          name="tanggal"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tanggal</FormLabel>
-              <FormControl>
-                <Input type="date" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="kategori"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Kategori</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+          <FormField
+            control={form.control}
+            name="tanggal"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tanggal</FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih kategori" />
-                  </SelectTrigger>
+                  <Input type="date" {...field} />
                 </FormControl>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.name}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }} />
-                        <span>{category.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="jenisTransaksi"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Jenis Transaksi</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+          <FormField
+            control={form.control}
+            name="kategori"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Kategori</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih kategori" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category.color }} />
+                          <span>{category.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="jenisTransaksi"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Jenis Transaksi</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih jenis transaksi" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {wallets.map((wallet) => (
+                      <SelectItem key={wallet.id} value={wallet.name}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: wallet.color }} />
+                          <span>{wallet.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="nominal"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nominal (Rp)</FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih jenis transaksi" />
-                  </SelectTrigger>
+                  <Input type="number" placeholder="0" {...field} onChange={(e) => field.onChange(e.target.value)} />
                 </FormControl>
-                <SelectContent>
-                  {wallets.map((wallet) => (
-                    <SelectItem key={wallet.id} value={wallet.name}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: wallet.color }} />
-                        <span>{wallet.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="nominal"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nominal (Rp)</FormLabel>
-              <FormControl>
-                <Input type="number" placeholder="0" {...field} onChange={(e) => field.onChange(e.target.value)} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="deskripsi"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Deskripsi</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Deskripsi transaksi (opsional)" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="status"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Status</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+          <FormField
+            control={form.control}
+            name="deskripsi"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Deskripsi</FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih status" />
-                  </SelectTrigger>
+                  <Textarea placeholder="Deskripsi transaksi (opsional)" {...field} />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="lunas">Lunas</SelectItem>
-                  <SelectItem value="belum-lunas">Belum Lunas</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <div className="flex justify-end gap-2 pt-4">
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Batal
+          <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="lunas">Lunas</SelectItem>
+                    <SelectItem value="belum-lunas">Belum Lunas</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="flex justify-end gap-2 pt-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Batal
+              </Button>
+            </DialogClose>
+            <Button
+              type="submit"
+              className={type === "pemasukan" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Menyimpan..." : "Simpan"}
             </Button>
-          </DialogClose>
-          <Button
-            type="submit"
-            className={type === "pemasukan" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Menyimpan..." : "Simpan"}
-          </Button>
-        </div>
-      </form>
-    </Form>
+          </div>
+        </form>
+      </Form>
+
+      {showSuccess && transactionData && (
+        <TransactionSuccess
+          type={type}
+          amount={transactionData.amount}
+          category={transactionData.category}
+          wallet={transactionData.wallet}
+          onClose={() => setShowSuccess(false)}
+        />
+      )}
+    </>
   )
 }
 

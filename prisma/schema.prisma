@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model Wallet {
+  id          String        @id @default(cuid())
+  name        String
+  icon        String?
+  color       String
+  balance     Float         @default(0)
+  type        String        @default("other")
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  transactions Transaction[]
+}
+
+model Category {
+  id          String        @id @default(cuid())
+  name        String
+  color       String
+  type        String // "pemasukan" | "pengeluaran" | "transfer" | "convert"
+  icon        String?
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  transactions Transaction[]
+}
+
+model Transaction {
+  id             String    @id @default(cuid())
+  date           DateTime
+  category       Category  @relation(fields: [categoryId], references: [id])
+  categoryId     String
+  wallet         Wallet    @relation(fields: [walletId], references: [id])
+  walletId       String
+  amount         Float
+  type           String // "pemasukan" | "pengeluaran" | "transfer" | "convert"
+  description    String?
+  status         String    @default("lunas")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  sourceWalletId String?
+  targetWalletId String?
+}
+

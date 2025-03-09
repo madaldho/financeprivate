@@ -29,7 +29,7 @@ export function EditTransactionDialog({ transaction, isOpen, onClose, onSuccess 
 
   useEffect(() => {
     if (isOpen && transaction) {
-      setFormData(transaction)
+      setFormData({ ...transaction })
       loadData()
     }
   }, [isOpen, transaction])

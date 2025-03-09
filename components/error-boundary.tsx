@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useEffect } from "react"
 
-export function ErrorBoundary({
+export async function ErrorBoundary({
   children,
 }: {
   children: React.ReactNode

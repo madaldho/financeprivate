@@ -1,10 +1,11 @@
 "use client"
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Settings2 } from "lucide-react"
-import { WalletSettings } from "./wallet-settings"
-import { CategorySettings } from "./category-settings"
+import { WalletSettings } from "./settings/wallet-settings"
+import { CategorySettings } from "./settings/category-settings"
 
 export function SettingsDialog() {
   return (
@@ -18,15 +19,15 @@ export function SettingsDialog() {
         <DialogHeader>
           <DialogTitle>Pengaturan</DialogTitle>
         </DialogHeader>
-        <Tabs defaultValue="wallets">
+        <Tabs defaultValue="wallets" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="wallets">Dompet</TabsTrigger>
+            <TabsTrigger value="wallets">Dompet & Rekening</TabsTrigger>
             <TabsTrigger value="categories">Kategori</TabsTrigger>
           </TabsList>
-          <TabsContent value="wallets">
+          <TabsContent value="wallets" className="mt-4">
             <WalletSettings />
           </TabsContent>
-          <TabsContent value="categories">
+          <TabsContent value="categories" className="mt-4">
             <CategorySettings />
           </TabsContent>
         </Tabs>

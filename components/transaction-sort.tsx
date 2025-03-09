@@ -18,11 +18,15 @@ import { Filter } from "lucide-react"
 
 interface TransactionSortProps {
   onSort: (sortBy: string, order: "asc" | "desc") => void
+  currentSort: {
+    by: string
+    order: "asc" | "desc"
+  }
 }
 
-export function TransactionSort({ onSort }: TransactionSortProps) {
-  const [sortBy, setSortBy] = useState("tanggal")
-  const [order, setOrder] = useState<"asc" | "desc">("desc")
+export function TransactionSort({ onSort, currentSort }: TransactionSortProps) {
+  const [sortBy, setSortBy] = useState(currentSort.by)
+  const [order, setOrder] = useState<"asc" | "desc">(currentSort.order)
 
   const handleApply = () => {
     onSort(sortBy, order)
@@ -82,7 +86,9 @@ export function TransactionSort({ onSort }: TransactionSortProps) {
 
         <SheetFooter>
           <SheetClose asChild>
-            <Button onClick={handleApply}>Terapkan</Button>
+            <Button onClick={handleApply} className="w-full">
+              Terapkan
+            </Button>
           </SheetClose>
         </SheetFooter>
       </SheetContent>
