@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getSummary } from "@/lib/sheet-actions"
+import { getSummary } from "@/lib/actions"
 import { ArrowUpCircle, ArrowDownCircle, DollarSign } from "lucide-react"
 import { motion } from "framer-motion"
 

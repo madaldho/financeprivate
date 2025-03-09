@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import type { WalletType } from "@/types/finance"
-import { getWalletBalances } from "@/lib/sheet-actions"
+import { getWallets } from "@/lib/actions"
 
 export function WalletSummary() {
   const [wallets, setWallets] = useState<WalletType[]>([])
@@ -12,7 +12,7 @@ export function WalletSummary() {
   useEffect(() => {
     async function fetchWallets() {
       try {
-        const data = await getWalletBalances()
+        const data = await getWallets()
         setWallets(data)
       } catch (error) {
         console.error("Error fetching wallets:", error)

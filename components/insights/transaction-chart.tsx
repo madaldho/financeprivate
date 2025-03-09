@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import type { DateRange } from "react-day-picker"
-import { getTransactions } from "@/lib/sheet-actions"
+import { getTransactions } from "@/lib/actions"
 import { LoadingState } from "@/components/loading-state"
 import { format, parseISO } from "date-fns"
 import { id } from "date-fns/locale"

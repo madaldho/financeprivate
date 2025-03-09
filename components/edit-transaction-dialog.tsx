@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { updateTransaction, getCategories, getWallets } from "@/lib/sheet-actions"
-import type { Transaction, Category, WalletBalance } from "@/lib/sheet-config"
+import { updateTransaction, getCategories, getWallets } from "@/lib/actions"
+import type { Transaction, Category, WalletBalance } from "@/lib/types"
 
 interface EditTransactionDialogProps {
   transaction: Transaction | null

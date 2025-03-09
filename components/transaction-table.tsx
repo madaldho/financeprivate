@@ -19,8 +19,24 @@ import {
 } from "@/components/ui/alert-dialog"
 import { EditTransactionDialog } from "./edit-transaction-dialog"
 import { TransactionSort } from "./transaction-sort"
-import { getTransactions, deleteTransaction } from "@/lib/sheet-actions"
-import { type Transaction, CATEGORY_COLORS } from "@/lib/sheet-config"
+import { getTransactions, deleteTransaction } from "@/lib/actions"
+import type { Transaction } from "@/lib/types"
+
+// Tambahkan konstanta CATEGORY_COLORS
+const CATEGORY_COLORS = {
+  "MAKAN/JAJAN": "#ff9800",
+  TRANSPORT: "#03a9f4",
+  FIX: "#757575",
+  KEBUTUHAN: "#9c27b0",
+  NGEHUTANG: "#f44336",
+  DIHUTANGI: "#ffc107",
+  CONVERT: "#2196f3",
+  BISNIS: "#4caf50",
+  GAJI: "#8bc34a",
+  HIBURAN: "#673ab7",
+  LAINNYA: "#607d8b",
+  default: "#757575",
+}
 import { useToast } from "@/hooks/use-toast"
 
 interface TransactionTableProps {

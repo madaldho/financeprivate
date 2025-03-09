@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts"
 import type { DateRange } from "react-day-picker"
-import { getTransactions, getCategories } from "@/lib/sheet-actions"
+import { getTransactions, getCategories } from "@/lib/actions"
 import { LoadingState } from "@/components/loading-state"
 
 interface CategoryDistributionProps {

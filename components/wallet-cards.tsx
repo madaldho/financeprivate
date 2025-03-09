@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getWallets } from "@/lib/sheet-actions"
+import { getWallets } from "@/lib/actions"
 import type { WalletBalance } from "@/lib/types"
 import { motion } from "framer-motion"
 

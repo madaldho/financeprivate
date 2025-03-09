@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { recoverData } from "@/lib/sheet-actions"
+// Hapus fungsi recoverData karena tidak lagi diperlukan
 
 export function DataRecovery() {
   const [isRecovering, setIsRecovering] = useState(false)
@@ -13,19 +13,13 @@ export function DataRecovery() {
       setIsRecovering(true)
       setMessage(null)
 
-      const result = await recoverData()
+      // Refresh halaman sebagai alternatif
+      window.location.reload()
 
-      if (result.success) {
-        setMessage("Data berhasil dipulihkan. Halaman akan dimuat ulang.")
-        setTimeout(() => {
-          window.location.reload()
-        }, 2000)
-      } else {
-        setMessage(result.message)
-      }
+      setMessage("Halaman akan dimuat ulang.")
     } catch (error) {
-      setMessage("Terjadi kesalahan saat memulihkan data")
-      console.error("Error recovering data:", error)
+      setMessage("Terjadi kesalahan saat memuat ulang data")
+      console.error("Error refreshing data:", error)
     } finally {
       setIsRecovering(false)
     }

@@ -9,9 +9,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { saveTransaction, getCategories, getWallets } from "@/lib/sheet-actions"
+import { saveTransaction, getCategories, getWallets } from "@/lib/actions"
+import type { Category, WalletBalance } from "@/lib/types"
 import { DialogClose } from "@/components/ui/dialog"
-import type { Category, WalletBalance } from "@/lib/sheet-config"
 import { TransactionSuccess } from "./transaction-success"
 
 const formSchema = z.object({
